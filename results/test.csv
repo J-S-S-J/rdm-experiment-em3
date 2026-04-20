@@ -1,0 +1,2 @@
+participant_id,session,trial_number,block_number,is_practice,coherence,direction,trial_start_trigger,stimulus_trigger,response_trigger,feedback_trigger,response,accuracy,reaction_time,stimulus_onset_time,response_time,trial_duration
+kjfdjs,1,1,0,1,0.4,left,20,141,1,10,left,1,0.23461,5.532768,5.767378,0.235039
