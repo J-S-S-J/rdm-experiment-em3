@@ -11,11 +11,11 @@ rdm_experiment/
 ├── src/
 │   ├── main.py            ← Entry point; run this file
 │   ├── stimulus.py        ← RandomDotMotion class (Britten et al. 1992 RDK)
-│   ├── trial.py           ← Single-trial logic + trial-list builder
+│   ├── trial.py           ← Single-trial logic + trigger handling + trial-list builder
 │   ├── utils.py           ← Config loader, CSV logger, UI helpers
 │   └── analyze_ddm.py     ← Post-hoc data check + HDDM-ready export
 ├── raw/
-│   └── config.json        ← ALL experiment parameters (edit here!)
+│   └── config.json        ← ALL experiment parameters, including optional triggers
 └── results/               ← Created automatically; one CSV per participant
     └── logs/              ← PsychoPy log files
 ```
@@ -63,12 +63,71 @@ results/<ParticipantID>_ses<N>_<YYYYMMDD_HHMMSS>.csv
 | `is_practice` | 1 for practice trials, 0 for main |
 | `coherence` | Fraction of coherent dots (0–1) |
 | `direction` | Correct direction (`left` / `right`) |
+| `trial_start_trigger` | Trigger code sent at fixation onset |
+| `stimulus_trigger` | Condition-encoded trigger sent at stimulus onset |
+| `response_trigger` | Trigger code sent for left/right response |
+| `feedback_trigger` | Trigger code sent for feedback onset |
 | `response` | Participant's response (`left` / `right` / `none`) |
 | `accuracy` | 1 = correct, 0 = error, NaN = no response |
 | `reaction_time` | Time from stimulus onset to keypress (seconds) |
 | `stimulus_onset_time` | Absolute time of stimulus onset since experiment start |
 | `response_time` | Absolute time of keypress since experiment start |
 | `trial_duration` | Duration from stimulus onset to trial end |
+
+---
+
+## EEG / TMS Triggers
+
+The experiment can emit optional single-byte hardware triggers for EEG or TMS.
+Triggering is configured in `raw/config.json` under the `triggers` block and is
+handled inside `trial.py` so the markers stay aligned with the actual visual
+events.
+
+### Event mapping
+
+- `trial_start` is sent on fixation onset.
+- `stimulus_base + coherence + direction_code` is sent on the first flipped
+    stimulus frame.
+- `left_response` and `right_response` are sent immediately when the response
+    key is detected.
+- `correct_feedback`, `incorrect_feedback`, and `timeout_feedback` are sent on
+    feedback onset when feedback is enabled.
+
+### Condition encoding
+
+Stimulus onset codes are built as:
+
+```python
+stimulus_trigger = stimulus_base + round(coherence * coherence_scale) + direction_code
+```
+
+For the default configuration, a `0.50` coherence rightward trial becomes:
+
+```python
+100 + 50 + 2 = 152
+```
+
+### Enabling hardware output
+
+Set these fields in `raw/config.json`:
+
+```json
+"triggers": {
+    "enabled": true,
+    "serial_port": "YOUR_PORT_NAME",
+    "baudrate": 115200
+}
+```
+
+If `enabled` is `false`, the experiment still records the trigger codes in the
+CSV file but does not send hardware output.
+
+If you want to use serial output, install `pyserial` in the same environment as
+PsychoPy:
+
+```bash
+pip install pyserial
+```
 
 ---
 
@@ -167,6 +226,7 @@ pip install pyddm
 ## Timing Precision Notes
 
 - The window uses `waitBlanking=True` for frame-locked timing.
+- Stimulus, fixation, and feedback triggers are scheduled with `win.callOnFlip()` so they line up with the displayed frame.
 - Response timestamps use PsychoPy's `event.getKeys(timeStamped=clock)` for sub-millisecond accuracy relative to stimulus onset.
 - A 60-frame timing check runs at startup; a warning is logged if frame intervals are variable (CV > 5%).
 - Fixation and ITI durations are jittered to decorrelate neural/behavioural events.
