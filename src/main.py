@@ -35,6 +35,7 @@ References
 
 import os
 import sys
+import math
 
 # ---------------------------------------------------------------------------
 # Path setup – allows running from any working directory
@@ -47,7 +48,7 @@ if _HERE not in sys.path:
 # ---------------------------------------------------------------------------
 # PsychoPy must be imported before other psychopy submodules
 # ---------------------------------------------------------------------------
-from psychopy import visual, core, event, monitors, logging as psy_logging
+from psychopy import visual, core, event, monitors, sound, logging as psy_logging
 
 # Local modules
 from stimulus import RandomDotMotion
@@ -64,6 +65,13 @@ from utils    import (
 CONFIG_PATH  = os.path.join(_ROOT, 'raw', 'config.json')
 RESULTS_DIR  = os.path.join(_ROOT, 'results')
 LOG_DIR      = os.path.join(_ROOT, 'results', 'logs')
+SOUNDS_DIR   = os.path.join(_ROOT, 'raw', 'sounds')
+
+PRE_EXPOSURE_DURATION_SECS = 20 * 60
+PRE_EXPOSURE_SOUND_FILES = {
+    'control': 'Pink-noise.wav',
+    'binaural': 'BB-400-420.wav',
+}
 
 
 def _open_trigger_port(trigger_cfg):
@@ -88,6 +96,83 @@ def _open_trigger_port(trigger_cfg):
     except Exception as exc:
         psy_logging.warning(f'Could not open trigger port {port_name}: {exc}')
         return None
+
+
+def _get_pre_exposure_setup(task_type):
+    """Resolve pre-exposure file and display behavior for a task type."""
+    task_type = str(task_type).strip().lower()
+    if task_type not in PRE_EXPOSURE_SOUND_FILES:
+        raise ValueError(
+            f"Unknown task type '{task_type}'. Use one of: "
+            f"{list(PRE_EXPOSURE_SOUND_FILES.keys())}"
+        )
+
+    filename = PRE_EXPOSURE_SOUND_FILES[task_type]
+    file_path = os.path.join(SOUNDS_DIR, filename)
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(
+            f"Missing pre-exposure sound file: {file_path}. "
+            f"Please add it to {SOUNDS_DIR}."
+        )
+
+    if task_type == 'control':
+        return file_path, True, 'CONTROL (pink noise + fixation cross)'
+    return file_path, False, 'BINAURAL'
+
+
+def _run_pre_exposure_block(win, fixation, config, task_type):
+    """Run 20-minute pre-exposure audio phase before the RDM task."""
+    audio_path, show_fixation, phase_label = _get_pre_exposure_setup(task_type)
+    continue_key = config['keys']['continue']
+    quit_key = config['keys']['quit']
+
+    intro_lines = [
+        f"{phase_label} PRE-PHASE",
+        '',
+        "Duration: 20 minutes",
+    ]
+    if show_fixation:
+        intro_lines.append("Keep your eyes on the fixation cross.")
+    intro_lines.extend([
+        '',
+        f"Press {continue_key.upper()} to start.",
+    ])
+    show_message(win, "\n".join(intro_lines), keys=[continue_key])
+
+    pre_sound = sound.Sound(value=audio_path)
+    clip_duration = float(pre_sound.getDuration())
+    if not math.isfinite(clip_duration) or clip_duration <= 0.0:
+        raise ValueError(f'Invalid audio duration for file: {audio_path}')
+
+    n_loops = int(math.ceil(PRE_EXPOSURE_DURATION_SECS / clip_duration))
+    phase_clock = core.Clock()
+    event.clearEvents(eventType='keyboard')
+
+    for _ in range(n_loops):
+        remaining = PRE_EXPOSURE_DURATION_SECS - phase_clock.getTime()
+        if remaining <= 0:
+            break
+
+        segment_duration = min(clip_duration, remaining)
+        pre_sound.play()
+        segment_clock = core.Clock()
+
+        while segment_clock.getTime() < segment_duration:
+            if event.getKeys(keyList=[quit_key]):
+                pre_sound.stop()
+                _graceful_exit(win)
+
+            if show_fixation:
+                fixation.draw()
+            win.flip()
+
+        pre_sound.stop()
+
+    show_message(
+        win,
+        f"Pre-phase complete.\n\nPress {continue_key.upper()} to continue to the main experiment.",
+        keys=[continue_key],
+    )
 
 
 # ===========================================================================
@@ -175,6 +260,16 @@ def run_experiment():
             config['text']['instructions'], config
         )
         show_message(win, instr_text, keys=[config['keys']['continue']])
+
+        # --------------------------------------------------------------
+        # 7b. 20-minute pre-exposure phase (task-type specific)
+        # --------------------------------------------------------------
+        _run_pre_exposure_block(
+            win=win,
+            fixation=fixation,
+            config=config,
+            task_type=participant_info['task_type'],
+        )
 
         # --------------------------------------------------------------
         # 8. Practice block

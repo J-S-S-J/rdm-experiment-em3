@@ -56,13 +56,14 @@ def get_participant_info():
     dlg_data = {
         'Participant ID': '',
         'Session': '1',
+        'Task Type': ['control', 'binaural'],
         'Age': '',
         'Handedness': ['right', 'left', 'ambidextrous'],
     }
     dlg = gui.DlgFromDict(
         dictionary=dlg_data,
         title='Random Dot Motion Task',
-        order=['Participant ID', 'Session', 'Age', 'Handedness'],
+        order=['Participant ID', 'Session', 'Task Type', 'Age', 'Handedness'],
     )
     if not dlg.OK:
         core.quit()
@@ -74,6 +75,7 @@ def get_participant_info():
     return {
         'participant_id': participant_id,
         'session': str(dlg_data['Session']),
+        'task_type': str(dlg_data['Task Type']).lower(),
         'age': str(dlg_data['Age']),
         'handedness': str(dlg_data['Handedness']),
     }
@@ -105,6 +107,7 @@ def make_results_path(results_dir, participant_id, session='1'):
 CSV_COLUMNS = [
     'participant_id',
     'session',
+    'task_type',
     'trial_number',
     'block_number',
     'is_practice',
@@ -156,6 +159,7 @@ class DataLogger:
         row = {
             'participant_id':    self.participant_info['participant_id'],
             'session':           self.participant_info.get('session', '1'),
+            'task_type':         self.participant_info.get('task_type', 'control'),
             'block_number':      block_number,
             'is_practice':       int(is_practice),
             **trial_result,
