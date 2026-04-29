@@ -83,51 +83,44 @@ Triggering is configured in `raw/config.json` under the `triggers` block and is
 handled inside `trial.py` so the markers stay aligned with the actual visual
 events.
 
-### Event mapping
+### What the numbers mean
 
-- `trial_start` is sent on fixation onset.
-- `stimulus_base + coherence + direction_code` is sent on the first flipped
-    stimulus frame.
-- `left_response` and `right_response` are sent immediately when the response
-    key is detected.
-- `correct_feedback`, `incorrect_feedback`, and `timeout_feedback` are sent on
-    feedback onset when feedback is enabled.
+Trigger numbers are single-byte event codes (0–255) written to the configured
+trigger port. The experiment sends codes to mark key events so the EEG recorder
+can timestamp them alongside the continuous signal.
 
-### Condition encoding
+Default codes (see `raw/config.json`):
 
-Stimulus onset codes are built as:
+- `trial_start` = 20 — sent at fixation onset.
+- `pre_exposure_start` = 30 — sent when the pre-exposure (sound) phase begins.
+- `pre_exposure_end` = 31 — sent when the pre-exposure phase ends (or on quit).
+- `stimulus` = `stimulus_base` + round(coherence * `coherence_scale`) + `direction_code` — sent at stimulus-frame flip.
+- `left_response` = 1, `right_response` = 2 — sent on participant response.
+- `correct_feedback` = 10, `incorrect_feedback` = 11, `timeout_feedback` = 12 — sent on feedback onset.
 
-```python
-stimulus_trigger = stimulus_base + round(coherence * coherence_scale) + direction_code
-```
+Example (default config): `coherence=0.25`, `direction=left` → `100 + 25 + 1 = 126`.
 
-For the default configuration, a `0.50` coherence rightward trial becomes:
+### How triggers are sent (code locations)
 
-```python
-100 + 50 + 2 = 152
-```
+- Trigger port opened by `_open_trigger_port()` in `src/main.py`.
+- Triggers are sent with `_send_trigger(port, code)` in `src/trial.py` (single-byte writes).
+- Stimulus triggers are scheduled with `win.callOnFlip(_send_trigger, ...)` so the byte is written on the same frame flip used to display the stimulus (minimizes visual-timing mismatch).
+- Pre-exposure start/end triggers are sent from `_run_pre_exposure_block()` in `src/main.py`.
 
-### Enabling hardware output
+### Hardware & timing notes
 
-Set these fields in `raw/config.json`:
+- Many EEG systems expect TTL pulses (digital voltage transitions). A plain USB-serial cable may not produce appropriate TTL levels — use a USB-to-TTL/DAQ interface or the EEG system's serial-to-digital input. Confirm voltage levels (3.3V vs 5V) and common ground.
+- Serial writes over USB can have small, variable latency; for visual stimuli the `callOnFlip` approach reduces timing error between the displayed frame and the trigger byte, but hardware-level jitter can remain.
+- For audio pre-exposure, if you need sample-accurate alignment consider routing a copy of the audio to an EEG analog input or using a hardware tap to generate TTLs from the audio output.
 
-```json
-"triggers": {
-    "enabled": true,
-    "serial_port": "YOUR_PORT_NAME",
-    "baudrate": 115200
-}
-```
+### Quick hardware test
 
-If `enabled` is `false`, the experiment still records the trigger codes in the
-CSV file but does not send hardware output.
+1. Configure `raw/config.json` with your `serial_port` and `enabled: true`.
+2. Install `pyserial` in the PsychoPy environment: `pip install pyserial`.
+3. Run the experiment and observe the EEG/oscilloscope while a short test pre-exposure or single trial runs.
+4. Alternatively, temporarily set `enabled: false` and add print statements near `_send_trigger` to verify the sequence of codes in software before connecting hardware.
 
-If you want to use serial output, install `pyserial` in the same environment as
-PsychoPy:
-
-```bash
-pip install pyserial
-```
+If you'd like, I can add the `pre_exposure_start`/`end` codes to the CSV output or create a small standalone trigger-test script for your hardware.
 
 ---
 

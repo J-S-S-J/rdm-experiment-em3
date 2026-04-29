@@ -19,7 +19,7 @@
   "stimulus": {
     "aperture_radius_deg": 8.0,
     "n_dots": 1000,
-    "dot_size_deg": 0.1,
+    "dot_size_deg": 0.1, 
     "dot_speed_deg_per_sec": 5.0,
     "dot_lifetime_frames": 10,
     "dot_color": [-1, -1, -1],
@@ -48,6 +48,8 @@
     "serial_port": "COM3",
     "baudrate": 115200,
     "trial_start": 20,
+    "pre_exposure_start": 30,
+    "pre_exposure_end": 31,
     "stimulus_base": 100,
     "coherence_scale": 100,
     "direction_codes": {
@@ -62,7 +64,7 @@
   },
 
   "design": {
-    "n_trials_per_condition": 10,
+    "n_trials_per_condition": 20,
     "n_practice_trials": 8,
     "practice_coherence": 0.4,
     "n_blocks": 4,
@@ -78,14 +80,14 @@
   },
 
   "text": {
-    "instructions": "RANDOM DOT MOTION TASK\n\nYou will see a cloud of moving dots.\nYour job is to judge the direction in which most dots are moving.\n\nPress '{left_key}' for LEFT\nPress '{right_key}' for RIGHT\n\nRespond as QUICKLY and ACCURATELY as possible.\nThere is no time limit, but please respond promptly.\n\nPress SPACE to begin the practice trials.",
+    "instructions": "RANDOM DOT MOTION TASK\n\nYou will first complete a sound phase. After that, you will perform a random dot motion task.\n\nPress '{left_key}' for LEFT\nPress '{right_key}' for RIGHT\n\nRespond as QUICKLY and ACCURATELY as possible. Each motion trial has a limited response window.\nPractice trials include feedback; the main experiment does not.\n\nPress {continue_key} to begin the practice trials. Press {quit_key} at any time to exit.",
 
-    "practice_start": "PRACTICE TRIALS\n\nYou will now complete {n} practice trials.\nFeedback will be provided after each response.\n\nPress SPACE to begin.",
+    "practice_start": "PRACTICE TRIALS\n\nYou will now complete {n} practice trials of the motion task.\nPress '{left_key}' for LEFT\nPress '{right_key}' for RIGHT\nFeedback will be provided after each response.\n\nPress {continue_key} to begin.",
 
-    "practice_end": "Practice complete!\n\nYou scored {score}% correct.\n\nThe main experiment will now begin.\nNo feedback will be given.\n\nPress SPACE to continue.",
+    "practice_end": "Practice complete!\n\nYou scored {score}% correct.\n\nThe main experiment will now begin.\nNo feedback will be given.\n\nPress {continue_key} to continue.",
 
-    "block_break": "Block {current} of {total} complete.\n\nTake a short break.\n\nPress SPACE when ready to continue.",
+    "block_break": "Block {current} of {total} complete.\n\nTake a short break.\n\nPress {continue_key} when ready to continue.",
 
-    "end": "Experiment complete!\n\nThank you for participating.\n\nPress SPACE to exit."
+    "end": "Experiment complete!\n\nThank you for participating.\n\nPress {continue_key} to exit."
   }
 }

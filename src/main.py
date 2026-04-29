@@ -52,7 +52,7 @@ from psychopy import visual, core, event, monitors, sound, logging as psy_loggin
 
 # Local modules
 from stimulus import RandomDotMotion
-from trial    import run_trial, build_trial_list, split_into_blocks
+from trial    import run_trial, build_trial_list, split_into_blocks, _send_trigger
 from utils    import (
     load_config, get_participant_info, make_results_path,
     DataLogger, show_message, build_instruction_text,
@@ -67,7 +67,7 @@ RESULTS_DIR  = os.path.join(_ROOT, 'results')
 LOG_DIR      = os.path.join(_ROOT, 'results', 'logs')
 SOUNDS_DIR   = os.path.join(_ROOT, 'raw', 'sounds')
 
-PRE_EXPOSURE_DURATION_SECS = 20 * 60
+PRE_EXPOSURE_DURATION_SECS = 20 * 60 # minutter gange sekunder. Ændre kun minutter
 PRE_EXPOSURE_SOUND_FILES = {
     'control': 'Pink-noise.wav',
     'binaural': 'BB-400-420.wav',
@@ -120,7 +120,8 @@ def _get_pre_exposure_setup(task_type):
     return file_path, False, 'BINAURAL'
 
 
-def _run_pre_exposure_block(win, fixation, config, task_type):
+def _run_pre_exposure_block(win, fixation, config, task_type,
+                            trigger_port=None, trigger_cfg=None):
     """Run 20-minute pre-exposure audio phase before the RDM task."""
     audio_path, show_fixation, phase_label = _get_pre_exposure_setup(task_type)
     continue_key = config['keys']['continue']
@@ -145,6 +146,12 @@ def _run_pre_exposure_block(win, fixation, config, task_type):
         raise ValueError(f'Invalid audio duration for file: {audio_path}')
 
     n_loops = int(math.ceil(PRE_EXPOSURE_DURATION_SECS / clip_duration))
+    trigger_cfg = trigger_cfg or config.get('triggers', {})
+    pre_start_code = int(trigger_cfg.get('pre_exposure_start', 30))
+    pre_end_code = int(trigger_cfg.get('pre_exposure_end', 31))
+
+    # Send start trigger for EEG marking (if hardware configured)
+    _send_trigger(trigger_port, pre_start_code)
     phase_clock = core.Clock()
     event.clearEvents(eventType='keyboard')
 
@@ -160,6 +167,7 @@ def _run_pre_exposure_block(win, fixation, config, task_type):
         while segment_clock.getTime() < segment_duration:
             if event.getKeys(keyList=[quit_key]):
                 pre_sound.stop()
+                _send_trigger(trigger_port, pre_end_code)
                 _graceful_exit(win)
 
             if show_fixation:
@@ -167,6 +175,9 @@ def _run_pre_exposure_block(win, fixation, config, task_type):
             win.flip()
 
         pre_sound.stop()
+
+    # Send end trigger for EEG marking
+    _send_trigger(trigger_port, pre_end_code)
 
     show_message(
         win,
@@ -269,6 +280,8 @@ def run_experiment():
             fixation=fixation,
             config=config,
             task_type=participant_info['task_type'],
+            trigger_port=trigger_port,
+            trigger_cfg=trigger_cfg,
         )
 
         # --------------------------------------------------------------
@@ -305,7 +318,8 @@ def run_experiment():
             100 * n_correct_practice / max(len(practice_trials), 1)
         )
         practice_end_text = config['text']['practice_end'].format(
-            score=pct_correct
+            score=pct_correct,
+            continue_key=config['keys']['continue'].upper(),
         )
         show_message(win, practice_end_text, keys=[config['keys']['continue']])
 
@@ -342,6 +356,7 @@ def run_experiment():
                 break_text = config['text']['block_break'].format(
                     current=block_idx,
                     total=n_blocks,
+                    continue_key=config['keys']['continue'].upper(),
                 )
                 show_message(win, break_text,
                              keys=[config['keys']['continue']])
@@ -349,7 +364,10 @@ def run_experiment():
         # --------------------------------------------------------------
         # 10. End screen
         # --------------------------------------------------------------
-        show_message(win, config['text']['end'],
+        end_text = config['text']['end'].format(
+            continue_key=config['keys']['continue'].upper(),
+        )
+        show_message(win, end_text,
                      keys=[config['keys']['continue']])
 
     # ------------------------------------------------------------------

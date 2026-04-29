@@ -235,6 +235,8 @@ def build_instruction_text(template, config):
     return template.format(
         left_key=config['keys']['left_response'].upper(),
         right_key=config['keys']['right_response'].upper(),
+        continue_key=config['keys']['continue'].upper(),
+        quit_key=config['keys']['quit'].upper(),
         n=config['design']['n_practice_trials'],
     )
 
