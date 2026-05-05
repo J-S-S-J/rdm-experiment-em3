@@ -128,7 +128,7 @@ def _run_pre_exposure_block(win, fixation, config, task_type,
     quit_key = config['keys']['quit']
 
     intro_lines = [
-        f"{phase_label} PRE-PHASE",
+        f"AUDIO PRE-PHASE",
         '',
         "Duration: 20 minutes",
     ]
