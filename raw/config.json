@@ -5,9 +5,9 @@
   "experiment": {
     "name": "Random Dot Motion Task",
     "version": "1.0.0",
-    "fullscreen": true,
-    "screen_width": 1920,
-    "screen_height": 1080,
+    "fullscreen": false,
+    "screen_width": 800,
+    "screen_height": 600,
     "monitor_name": "rdm_monitor",
     "monitor_width_cm": 53.0,
     "viewing_distance_cm": 60.0,
@@ -46,7 +46,7 @@
 
   "triggers": {
     "enabled": true,
-    "serial_port": "COM3",
+    "serial_port": "COM4",
     "baudrate": 115200,
     "trial_start": 20,
     "pre_exposure_start": 30,

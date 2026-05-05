@@ -150,6 +150,12 @@ def _run_pre_exposure_block(win, fixation, config, task_type,
     pre_start_code = int(trigger_cfg.get('pre_exposure_start', 30))
     pre_end_code = int(trigger_cfg.get('pre_exposure_end', 31))
 
+    # Create countdown timer display
+    timer_text = visual.TextStim(
+        win, text="20:00", color=config['experiment']['text_color'],
+        height=2.0, units='deg', bold=True
+    )
+
     # Send start trigger for EEG marking (if hardware configured)
     _send_trigger(trigger_port, pre_start_code)
     phase_clock = core.Clock()
@@ -170,8 +176,15 @@ def _run_pre_exposure_block(win, fixation, config, task_type,
                 _send_trigger(trigger_port, pre_end_code)
                 _graceful_exit(win)
 
-            if show_fixation:
-                fixation.draw()
+            # Calculate remaining time and format as MM:SS
+            elapsed = phase_clock.getTime()
+            remaining_secs = max(0, PRE_EXPOSURE_DURATION_SECS - elapsed)
+            minutes = int(remaining_secs // 60)
+            seconds = int(remaining_secs % 60)
+            timer_text.text = f"{minutes}:{seconds:02d}"
+
+            # Draw timer (replaces fixation cross for both conditions)
+            timer_text.draw()
             win.flip()
 
         pre_sound.stop()
@@ -254,7 +267,9 @@ def run_experiment():
     # ------------------------------------------------------------------
     rdm_stim = RandomDotMotion(win, config['stimulus'])
     fixation = make_fixation(win, config)
+    
     trigger_port = _open_trigger_port(trigger_cfg)
+    print(trigger_port)
 
     # Global experiment clock (starts here; all onset times relative to this)
     global_clock = core.Clock()
