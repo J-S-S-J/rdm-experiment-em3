@@ -67,7 +67,7 @@ RESULTS_DIR  = os.path.join(_ROOT, 'results')
 LOG_DIR      = os.path.join(_ROOT, 'results', 'logs')
 SOUNDS_DIR   = os.path.join(_ROOT, 'raw', 'sounds')
 
-PRE_EXPOSURE_DURATION_SECS = 1 * 60 # minutter gange sekunder. Ændre kun minutter
+PRE_EXPOSURE_DURATION_SECS = 20 * 60 # minutter gange sekunder. Ændre kun minutter
 PRE_EXPOSURE_SOUND_FILES = {
     'control': 'Pink-noise.wav',
     'binaural': 'BB-400-420.wav',
