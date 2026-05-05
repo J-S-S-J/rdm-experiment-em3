@@ -49,6 +49,9 @@ def run_trial(win, rdm_stim, fixation_stim, trial_def, config, global_clock,
     left_key  = keys_cfg['left_response']
     right_key = keys_cfg['right_response']
     trigger_cfg = trigger_cfg or config.get('triggers', {})
+    timeout_feedback_duration = float(
+        timing.get('timeout_feedback_duration', timing['feedback_duration'])
+    )
 
     trial_start_code = int(trigger_cfg.get('trial_start', 20))
     stimulus_code = _build_stimulus_trigger_code(
@@ -138,7 +141,7 @@ def run_trial(win, rdm_stim, fixation_stim, trial_def, config, global_clock,
         )
     elif show_feedback and response is None:
         _show_text_feedback(
-            win, "Too slow!", timing['feedback_duration'],
+            win, "Too slow!", timeout_feedback_duration,
             trigger_port=trigger_port, trigger_code=timeout_feedback_code,
         )
 
@@ -209,7 +212,7 @@ def _show_feedback(win, accuracy, duration, trigger_port=None,
 def _show_text_feedback(win, text, duration, trigger_port=None,
                         trigger_code=None):
     """Show a text string as feedback."""
-    fb = visual.TextStim(win, text=text, color=[0.9, 0.5, 0.0],
+    fb = visual.TextStim(win, text=text, color=[1.0, 0.0, 0.0],
                          height=0.7, units='deg')
     fb_clock = core.Clock()
     first_frame = True
