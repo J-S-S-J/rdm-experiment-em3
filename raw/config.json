@@ -65,7 +65,7 @@
   },
 
   "design": {
-    "n_trials_per_condition": 20,
+    "n_trials_per_condition": 40,
     "n_practice_trials": 15,
     "practice_coherence": 0.4,
     "n_blocks": 4,
