@@ -45,10 +45,20 @@ _ROOT = os.path.dirname(_HERE)
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-# ---------------------------------------------------------------------------
-# PsychoPy must be imported before other psychopy submodules
-# ---------------------------------------------------------------------------
+## JOHAN, VAR NØDT TIL AT GØRE DETTE FOR NOGLE TEKNISKE PROBLEMER
+from psychopy import prefs
+
+# Force PsychoPy to use the system default audio device
+prefs.hardware['audioDevice'] = ['External Headphones'] 
+
 from psychopy import visual, core, event, monitors, sound, logging as psy_logging
+
+
+
+# ---------------------------------------------------------------------------
+# PsychoPy must be imported before other psychopy submodules (KOMMENTER TILBAGE!!)
+# ---------------------------------------------------------------------------
+# from psychopy import visual, core, event, monitors, sound, logging as psy_logging
 
 # Local modules
 from stimulus import RandomDotMotion
@@ -247,6 +257,7 @@ def run_experiment():
     # ------------------------------------------------------------------
     monitor = _build_monitor(exp_cfg)
     win = visual.Window(
+        screen=1,
         size=(exp_cfg['screen_width'], exp_cfg['screen_height']),
         fullscr=exp_cfg['fullscreen'],
         color=exp_cfg['background_color'],
