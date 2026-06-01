@@ -1,0 +1,390 @@
+---
+title: "CPP_slopes"
+format: html
+---
+
+```{r}
+
+library(tidyverse)
+library(readr)
+library(broom)
+library(viridis)
+library(BayesFactor)
+
+```
+
+
+# Slopes of CSD (reponse locked)
+
+```{r}
+d1 <- read_csv("cpp_response_locked_data.csv") |> filter(Time > -0.5)
+```
+
+
+
+```{r}
+
+# setup window
+tmin_fit <- -0.25
+tmax_fit <- -0.01
+
+
+d1 |>
+  ggplot(aes(x = Time, y = Amplitude)) +
+  facet_wrap(~ Condition, labeller = as_labeller(c(
+    "Control" = "Kontrol", 
+    "BB" = "BB"
+  ))) +
+  
+  # shade the window
+  annotate("rect", xmin = tmin_fit, xmax = tmax_fit, ymin = -Inf, ymax = Inf, 
+           fill = "gray", alpha = 0.2) +
+  
+  geom_vline(xintercept = 0, color = "black", linetype = "dashed") +
+  geom_line(aes(group = Coherence, color = Coherence_Num), linewidth = 0.5, alpha = 0.5) +
+  geom_smooth(
+    data = d1 |> filter(Time >= tmin_fit & Time <= tmax_fit),
+    aes(group = Coherence, color = Coherence_Num), 
+    method = "lm",               
+    formula = y ~ x,
+    se = FALSE,               
+    linewidth = 1) +
+  
+  
+  scale_color_viridis_c(name = "Kohærens (%)", option = "viridis", direction = -1 ) +
+  
+  labs(
+    title = "CPP Build-up rate per kohærens",
+    x = "Tid (s)",
+    y = expression("Amplitude")
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    strip.text = element_text(face = "bold", size = 12),
+    strip.background = element_blank()
+  )
+
+
+```
+
+
+## ANOVA on slopes
+
+```{r}
+
+d2 <- read_csv("single_trial_slopes.csv")
+
+
+anova_slopes <- aov(Slope ~ Condition * factor(Coherence), data = d2)
+
+summary(anova_slopes)
+head(d2)
+
+```
+
+## BF on slopes
+
+```{r}
+d2 <- read_csv("single_trial_slopes.csv") |>
+  mutate(Condition = as.factor(Condition),
+         Coherence = as.factor(Coherence))
+                               
+
+bf_slopes <- anovaBF(Slope ~ Condition * Coherence, data = d2)
+
+```
+
+
+
+```{r}
+d2 |>  
+  # Crucial fix: Added 'group = interaction(Coherence, Condition)' 
+  # This guarantees R calculates the dodge positions for text labels perfectly
+  ggplot(aes(x = Coherence, y = Slope, fill = Condition, group = interaction(Coherence, Condition))) +
+  
+  geom_boxplot(
+    position = position_dodge(width = 0.8),
+    width = 0.6, 
+    alpha = 0.8, 
+    outlier.alpha = 0.4 
+  ) +
+  
+  # Code to display mean values as numbers
+  stat_summary(
+    fun = mean,
+    geom = "text",
+    # Using %.2e ensures small slopes look like '2.34e-04' instead of '0.00'
+    aes(label = sprintf("%.2e", after_stat(y))),  
+    position = position_dodge(width = 0.8),       
+    vjust = -0.7,                                 # Slightly pushed up away from overlapping lines
+    size = 3.2,                                   # Made slightly smaller to fit the 6x12 grid cleanly
+    fontface = "bold",
+    show.legend = FALSE                           
+  ) +
+  
+  # Colors
+  scale_fill_manual(
+    values = c("Control" = "blue", "BB" = "orange"),
+    labels = c("Control" = "Control (Pink Noise)", "BB" = "Binaural Beats (20 Hz)")
+  ) +
+  
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  
+  # Labels (Fixed: Removed duplicate y argument)
+  labs(
+    title = "CPP Build-up Rates (Pre-Response)",
+    x = "Coherence Level (%)",
+    y = expression("Slope " * (x10^-3)),
+    fill = "Condition"
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 10, face = "italic"),
+    legend.position = "top"
+  )
+
+```
+
+# v2
+
+```{r}
+d2 |>  
+  ggplot(aes(
+    x = as.factor(Coherence), 
+    y = Slope * 1e6,          
+    fill = Condition
+  )) +
+  
+  geom_boxplot(
+    position = position_dodge(width = 0.75),
+    width = 0.6, 
+    alpha = 0.7, 
+    linewidth = 0.6,
+    outlier.shape = NA        # Hides the outlier dots completely
+  ) +
+  
+  # Clean, decimal mean labels placed safely ABOVE the boxes
+  stat_summary(
+    fun = mean,
+    geom = "text",
+    aes(label = sprintf("%.2f", after_stat(y)), group = Condition),  
+    position = position_dodge(width = 0.75),       
+    vjust = -1.4,                # Slightly adjusted to stay clear of the whiskers
+    size = 3.2,                  
+    fontface = "bold",
+    show.legend = FALSE                           
+  ) +
+  
+  # --- RESTORED: Your original bright colors ---
+  scale_fill_manual(
+    values = c("Control" = "red", "BB" = "black"),
+    labels = c("Control" = "Kontrol", "BB" = "BB")
+  ) +
+  
+  # --- ADDED: Automatic zoom on the boxes (ignores outliers when choosing limits) ---
+  scale_y_continuous(limits = c(
+    min(d2$Slope * 1e6) * 0.8,   # Dynamically finds the lowest box/whisker bottom
+    max(d2$Slope * 1e6) * 0.4    # Cuts off the massive upper outlier space to zoom in
+  )) +
+  
+  # Clean Baseline
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray60", linewidth = 0.5) +
+  
+  # Updated labels
+  labs(
+    title = "CPP Build-up rates",
+    x = "Kohærens (%)",
+    y = expression("Slope " * (x10^-6)),
+    fill = "Kondition"
+  ) +
+  
+  theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 10, face = "italic", color = "gray30"),
+    axis.text = element_text(size = 10, color = "black"),
+    axis.title = element_text(size = 11, face = "bold"),
+    legend.position = "top",
+    legend.background = element_blank()
+  )
+```
+
+
+
+# Descision threshhold¨
+
+```{r}
+d3 <- read_csv("single_trial_thresholds.csv") |>
+  mutate(Condition = as.factor(Condition),
+         Coherence = as.factor(Coherence))
+
+
+bf_threshold_model <- anovaBF(Peak_Amplitude ~ Condition * Coherence, data = d3)
+
+print(bf_threshold_model)
+```
+
+
+
+
+# STINE 
+
+
+
+```{r}
+drift_rates <- tibble(
+  Coherence = rep(c(0, 3, 6, 12, 25, 50), 2),
+  Condition = c(rep("BB", 6), rep("Control", 6)),
+  Drift_Rate = c(
+    # Binaural Beats values
+    0.599, 0.767, 0.934, 1.269, 1.996, 3.393,
+    # Control values
+    0.778, 0.945, 1.113, 1.448, 2.175, 3.572
+  )
+) |>
+  mutate(Coherence = as.factor(Coherence))
+```
+
+```{r}
+# 1. Calculate your slope means as before
+slope_means_table <- d2 |> 
+  group_by(Coherence, Condition) |> 
+  summarise(
+    Mean_Slope_Raw    = mean(Slope, na.rm = TRUE),
+    Mean_Slope_Scaled = mean(Slope * 1e6, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# 2. Merge them together by Coherence and Condition
+cpp_vs_drift_df <- slope_means_table |> 
+  left_join(drift_rates, by = c("Coherence", "Condition"))
+
+# Print the final combined dataframe
+print(cpp_vs_drift_df)
+```
+
+```{r}
+# Quick correlation check: Do higher CPP slopes track higher drift rates?
+cor.test(cpp_vs_drift_df$Mean_Slope_Raw,cpp_vs_drift_df$Drift_Rate)
+```
+
+```{r}
+slope_ttest <- t.test(Mean_Slope_Raw ~ Condition, data = cpp_vs_drift_df)
+
+# View the full output
+print(slope_ttest)
+```
+
+```{r}
+slope_means_table |>
+  # Ensure Coherence is continuous numeric for ribbon mapping
+  ggplot(aes(x = as.numeric(Coherence), y = Mean_Slope_Scaled, color = Condition, fill = Condition)) +
+  
+  # 1. Fit separate linear regression lines with a very faint Standard Error ribbon
+  geom_smooth(
+    method = "lm", 
+    se = TRUE,           # TRUE turns the Standard Error ribbon back on!
+    alpha = 0.08,        # Very low alpha makes the ribbon whisper-quiet in the background
+    linewidth = 1.2, 
+    aes(group = Condition)
+  ) +
+  
+  # 2. Add the actual data points on top of the lines/ribbons
+  geom_point(
+    size = 4, 
+    shape = 21,         
+    color = "black",    # Solid black border lines around your points
+    stroke = 1.0, 
+    alpha = 0.9
+  ) +
+  
+  # 3. Your signature colors applied to lines, borders, and ribbons
+  scale_color_manual(
+    values = c("Control" = "black", "BB" = "red"),
+    labels = c("Control" = "Kontrol", "BB" = "BB")
+  ) +
+  scale_fill_manual(
+    values = c("Control" = "black", "BB" = "red"),
+    labels = c("Control" = "Kontrol", "BB" = "BB") # Fixed trailing parenthesis typo here
+  ) +
+  
+  # --- ADDED: Hides the duplicate condition border text from the legend ---
+  guides(color = "none") + 
+  # ------------------------------------------------------------------------
+  
+  # Clean Baseline at zero
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray60", linewidth = 0.5) +
+  
+  # 4. Labels matching your standard layout
+  labs(
+    title = "CPP Build-up slopes lineær fit",
+    x = "Kohærens (%)",
+    y = expression("Mean slope " * (x10^-6)),
+    fill = "Condition" # Keeps only the Fill title active
+  ) +
+  
+  # 5. Clean, professional theme settings
+  theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 10, face = "italic", color = "gray30"),
+    axis.text = element_text(size = 10, color = "black"),
+    axis.title = element_text(size = 11, face = "bold"),
+    legend.position = "top",
+    legend.background = element_blank()
+  )
+```
+
+
+
+```{r}
+
+ggplot(cpp_vs_drift_df, aes(x = Drift_Rate, y = Mean_Slope_Scaled, color = Condition)) +
+  
+  # Add trend lines to see if they track linearly
+  geom_smooth(method = "lm", se = FALSE, aes(group = Condition), linetype = "dashed", alpha = 0.5, size = 0.8) +
+  
+  # Add the actual data points
+  geom_point(size = 4, alpha = 0.9) +
+  
+  # Label the coherence percentage directly next to each point so you can track the progression
+  geom_text(
+    aes(label = paste0(Coherence, "%")), 
+    vjust = -1, 
+    hjust = 0.5, 
+    size = 3.5, 
+    fontface = "bold",
+    show.legend = FALSE
+  ) +
+  
+  # Original vibrant colors
+  scale_color_manual(
+    values = c("Control" = "black", "BB" = "red"),
+    labels = c("Control" = "Control (Pink Noise)", "BB" = "Binaural Beats (20 Hz)")
+  ) +
+  
+  # Formatting limits to give the text labels breathing room at the edges
+  expand_limits(y = c(min(cpp_vs_drift_df$Mean_Slope_Scaled)*0.8, max(cpp_vs_drift_df$Mean_Slope_Scaled)*1.2)) +
+  
+  # Labels
+  labs(
+    title = "DDM Drift Rates vs. CPP Build-up Slopes",
+    x = "Drift Rate (v)",
+    y = expression("Mean CPP Slope " * (x10^-6)),
+    color = "Kondition"
+  ) +
+  
+  theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 10, face = "italic", color = "gray30"),
+    axis.text = element_text(size = 10, color = "black"),
+    axis.title = element_text(size = 11, face = "bold"),
+    legend.position = "top"
+  )
+```
+
+

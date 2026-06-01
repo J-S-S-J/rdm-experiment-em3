@@ -1,0 +1,162 @@
+---
+title: "analyze_power"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(readr)
+library(BayesFactor)
+```
+
+```{r}
+
+d1 <- read_csv("/Users/johanandersen/Desktop/EM3/experiment-local/EEG-data/EEG-final-analysis/eeg_psd_new.csv") |>
+   filter(ROI != "Occipital_Visual") |> 
+  mutate(
+    Participant = as.factor(Participant),
+    Condition = as.factor(Condition),
+    ROI = as.factor(ROI),
+    Segment_ID = as.numeric(Segment_ID)) |>
+  drop_na(relative_power, Condition, ROI, Segment_ID) 
+ 
+
+
+
+glimpse(d1)
+
+```
+
+```{r}
+d2_frontal <- d1 |>
+  filter(ROI == "Frontal")
+
+```
+
+
+```{r}
+d2_frontal |>
+  ggplot(aes(x=Segment_ID, y=relative_power)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~Condition)
+```
+
+
+```{r}
+d1 |>
+  ggplot(aes(x=Segment_ID, y=relative_power)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_grid(Condition ~ ROI)
+```
+
+
+```{r}
+d1 |>
+  ggplot(aes(x = Segment_ID, y = relative_power, color = Condition, fill = Condition)) +
+  
+  # 1. The Points: Add transparency (alpha) so overlapping points look like a heat cluster
+  geom_point(alpha = 0.4, size = 1.5) +
+  
+  # 2. The Line: Thicker line, subtle confidence interval ribbon
+  geom_smooth(method = "lm", linewidth = 1, alpha = 0.2) +
+  
+  # 3. The Grid: Split by Condition (Rows) and ROI (Columns)
+  facet_grid(Condition ~ ROI) +
+  
+  # 4. Consistent Colors: Map colors to match your previous ERP plots
+  scale_color_manual(values = c("Control" = "black", "Binaural" = "red")) +
+  scale_fill_manual(values = c("Control" = "black", "Binaural" = "red")) +
+  
+  # 5. Professional Labels
+  labs(
+    title = "20 Hz RP over tid",
+
+    x = "Tidssegment",
+    y = "RP"
+  ) +
+  
+  # 6. A Clean Theme: theme_bw() puts a nice border around facet grids
+  theme_bw() +
+  theme(
+    # Center and bold the titles
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5, face = "italic", color = "grey30"),
+    
+    # Style the facet headers (the grey boxes at the top and side)
+    strip.background = element_rect(fill = "grey95", color = "black"),
+    strip.text = element_text(face = "bold", size = 11),
+    
+    # Hide the legend! Since the rows are already labeled by Condition, a legend is redundant
+    legend.position = "none" 
+  )
+```
+
+
+
+```{r}
+library(BayesFactor)
+
+# Run a Bayesian ANOVA with an interaction term
+banova_results <- anovaBF(
+  relative_power ~ Condition * ROI, 
+  data = d1,
+  whichRandom = "Segment_ID" # Accounts for your repeated 20s time segments
+)
+
+# Print the results to see the Bayes Factors
+banova_results
+```
+
+Step-by-Step Breakdown
+[1] Condition (BF=0.12)
+What it means: Looked at entirely on its own (averaging across all brain regions), the condition doesn't seem to do much. In fact, a BF of 0.12 is less than 1, meaning there is actually evidence against a global, blanket effect of Condition across the entire brain.
+[2] ROI (BF=3.59×10 
+248
+ )
+What it means: There are massive, baseline differences in relative power between your different brain regions (e.g., Frontal power is naturally different from Occipital power). This is completely expected in EEG data.
+[3] Condition + ROI (BF=3.09×10 
+248
+ )
+What it means: Combining them additively is incredibly strong, but that strength is almost entirely carried by the massive baseline differences in the ROIs we just noted in Model 2.
+[4] Condition + ROI + Condition:ROI (BF=1.08×10 
+257
+ )
+What it means: Notice how the exponent jumped from 248 to 257. That is a billion-fold increase in evidence (10 
+9
+ ) compared to Model 3. Adding the interaction term (Condition:ROI) drastically improves the model.
+
+# Open science
+
+```{r}
+o1 <- read_csv("/Users/johanandersen/Desktop/EM3/experiment-local/EEG-data/open_power2.csv")
+```
+
+```{r}
+o2_frontal <- o1 |>
+  filter(ROI == "Frontal")
+
+```
+
+```{r}
+o2_frontal |>
+  ggplot(aes(x=Segment_ID, y=relative_power)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~Participant)
+```
+
+```{r}
+o1 |>
+  ggplot(aes(x = Segment_ID, y = relative_power, color = Participant)) +
+  geom_point(alpha = 0.5) +  
+  geom_smooth(method = "lm", se = FALSE) +  
+  facet_grid(Condition ~ ROI) +
+  theme_bw() +
+  labs(
+    x = "Segment-id",       # Danish for Segment ID
+    y = "Relativ Power"    # Danish for Relative Power
+  )
+```
+

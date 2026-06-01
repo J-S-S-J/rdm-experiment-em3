@@ -1,0 +1,26 @@
+{
+    "id": "4C9B18D1",
+    "path": "~/Desktop/EM3/experiment-local/EEG-data/analyze_power.qmd",
+    "project_path": "analyze_power.qmd",
+    "type": "quarto_markdown",
+    "hash": "0",
+    "contents": "",
+    "dirty": true,
+    "created": 1780216145068.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "202,29",
+        "scrollLine": "178"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1780341772,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1780342366907,
+    "read_only": false,
+    "read_only_alternatives": []
+}
