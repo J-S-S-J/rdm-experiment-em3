@@ -1,0 +1,303 @@
+---
+title: "bayes_analysis"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+
+library(rstatix)
+library(lme4)
+library(lmerTest)
+
+library(BayesFactor)
+
+library(ggthemes)
+library(extrafont)
+```
+
+## Load data og præprocessering
+
+```{r}
+
+df_binaural_eeg <- read_csv("data/eegbinaural_ses1_20260508_092645.csv")
+df_control_eeg  <- read_csv("data/eegcontrol_ses1_20260508_084700.csv")
+
+df_binaural_eeg$participant_id <- "eeg"
+df_control_eeg$participant_id <- "eeg"
+
+df_binaural_eeg$condition <- "binaural"
+df_control_eeg$condition  <- "control"
+
+df_binaural_david <- read_csv("data/David_binarual_ses1_20260514_172049.csv")
+df_control_david <- read_csv("data/Johan_control_ses1_20260514_132716.csv")
+
+df_binaural_david$participant_id <- "david"
+df_control_david$participant_id <- "david"
+
+df_binaural_david$condition <- "binaural"
+df_control_david$condition  <- "control"
+
+raw_df <- bind_rows(df_binaural_eeg, df_control_eeg, df_binaural_david, df_control_david)
+```
+
+```{r}
+raw_df <- raw_df |>
+  
+  filter(
+    is_practice == FALSE,
+    reaction_time < 2,
+    reaction_time > 0.15
+  ) |>
+  
+  mutate(
+    ID = factor(participant_id),
+    condition = factor(condition),
+    coherence = factor(coherence),
+    accuracy = as.numeric(accuracy),
+    log_rt = log(reaction_time)
+  )
+```
+
+```{r}
+raw_df |> summarise_all(n_distinct)
+```
+
+## Accuracy Analyse
+
+```{r}
+accuracy_fig <- raw_df |>
+  
+  group_by(ID, condition, coherence) |>
+  summarise(mean_accuracy = mean(accuracy), .groups = "drop") |>
+  
+  ggplot(aes(x = coherence,
+             y = mean_accuracy,
+             fill = condition)) +
+  
+  geom_boxplot(alpha = 0.6,
+               outlier.alpha = 0.2) +
+  
+  stat_summary(
+    fun = mean,
+    geom = "point",
+    shape = 23,
+    size = 3,
+    fill = "white"
+  ) +
+  
+  facet_wrap(~condition) +
+  
+  labs(
+    title = "Accuracy across coherence levels",
+    subtitle = "White diamond indicates group mean",
+    y = "Mean Accuracy",
+    x = "Coherence"
+  ) +
+  
+  theme_fivethirtyeight() +
+  scale_fill_brewer(palette = "Set1") +
+  
+  theme(
+    axis.title = element_text(),
+    legend.position = "bottom",
+    text = element_text(family = "IBM Plex Mono")
+  )
+
+accuracy_fig
+```
+
+```{r}
+anova_data <- raw_df |>
+  
+  group_by(ID, condition, coherence) |>
+  
+  summarise(
+    mean_accuracy = mean(accuracy),
+    .groups = "drop"
+  )
+
+accuracy_anova <- anova_data |>
+  
+  anova_test(
+    dv = mean_accuracy,
+    wid = ID,
+    within = c(condition, coherence),
+    effect.size = "ges"
+  )
+
+get_anova_table(accuracy_anova)
+```
+
+```{r}
+accuracy_lmm <- lmer(
+  
+  accuracy ~ condition * coherence +
+    
+    (1 | ID),
+  
+  data = raw_df
+)
+
+summary(accuracy_lmm)
+```
+
+```{r}
+participant_accuracy <- raw_df |>
+  
+  group_by(ID, condition) |>
+  
+  summarise(
+    mean_accuracy = mean(accuracy),
+    .groups = "drop"
+  )
+
+participant_accuracy |>
+  
+  ggplot(aes(
+    x = condition,
+    y = mean_accuracy,
+    group = ID
+  )) +
+  
+  geom_line(alpha = 0.25) +
+  
+  stat_summary(
+    aes(group = 1),
+    fun = mean,
+    geom = "line",
+    color = "red",
+    linewidth = 2
+  ) +
+  
+  labs(
+    title = "Individual Differences in Binaural Effect",
+    subtitle = "Grey lines = participants, red = group average",
+    y = "Mean Accuracy"
+  ) +
+  
+  theme_fivethirtyeight() +
+  
+  theme(
+    text = element_text(family = "IBM Plex Mono")
+  )
+```
+
+## Reaction Time Analyse
+
+```{r}
+rt_fig <- raw_df |>
+  
+  filter(accuracy == 1) |>
+  
+  ggplot(aes(
+    x = condition,
+    y = reaction_time,
+    fill = condition
+  )) +
+  
+  geom_violin(
+    alpha = 0.5,
+    trim = FALSE
+  ) +
+  
+  geom_boxplot(
+    width = 0.1,
+    fill = "white",
+    outlier.shape = NA
+  ) +
+  
+  facet_wrap(~coherence) +
+  
+  coord_cartesian(ylim = c(0, 2)) +
+  
+  labs(
+    title = "Reaction Time by Condition",
+    subtitle = "Correct trials only",
+    y = "Reaction Time (seconds)",
+    x = "Condition"
+  ) +
+  
+  scale_fill_brewer(palette = "Set1") +
+  
+  theme_fivethirtyeight() +
+  
+  theme(
+    text = element_text(family = "IBM Plex Mono")
+  )
+
+rt_fig
+```
+
+```{r}
+rt_bayes_data <- raw_df |>
+  
+  filter(accuracy == 1) |>
+  
+  group_by(ID, condition, coherence) |>
+  
+  summarise(
+    mean_rt = mean(reaction_time),
+    .groups = "drop"
+  ) |>
+  
+  mutate(
+    ID = factor(ID),
+    condition = factor(condition),
+    coherence = factor(coherence)
+  ) |>
+  
+  as.data.frame()
+```
+
+```{r}
+rt_bf_model <- anovaBF(
+  
+  mean_rt ~ condition * coherence + ID,
+  
+  data = rt_bayes_data,
+  
+  whichRandom = "ID",
+  
+  progress = FALSE
+)
+
+print(rt_bf_model)
+```
+
+```{r}
+rt_bf_model / rt_bf_model[1]
+```
+
+```{r}
+accuracy_bayes_data <- raw_df |>
+  
+  group_by(ID, condition, coherence) |>
+  
+  summarise(
+    mean_accuracy = mean(accuracy),
+    .groups = "drop"
+  ) |>
+  
+  mutate(
+    ID = factor(ID),
+    condition = factor(condition),
+    coherence = factor(coherence)
+  ) |>
+  
+  as.data.frame()
+
+accuracy_bf_model <- anovaBF(
+  
+  mean_accuracy ~ condition * coherence + ID,
+  
+  data = accuracy_bayes_data,
+  
+  whichRandom = "ID",
+  
+  progress = FALSE
+)
+
+print(accuracy_bf_model)
+```
